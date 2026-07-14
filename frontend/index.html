@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Cloud Native Web App</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Cloud Native Web App</h1>
+    <p class="description">
+      CloudFront + S3 + ALB + EC2 + RDS 構成のハンズオンです。
+    </p>
+
+    <section class="card">
+      <h2>API疎通確認</h2>
+      <p>ボタンを押すと、CloudFront 経由で /api/message を呼び出します。</p>
+      <button id="loadMessage">APIを呼び出す</button>
+      <p id="message" class="message"></p>
+    </section>
+
+    <section class="card">
+      <h2>構成</h2>
+      <p>静的ファイルはS3、API通信はALB配下のEC2、DBはRDS MySQLを利用します。</p>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
