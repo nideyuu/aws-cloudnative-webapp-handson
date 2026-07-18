@@ -262,9 +262,178 @@ Dockerイメージ取得
 
 そのため、Private Subnet上のEC2から外向き通信を行うためにNAT Gatewayを利用します。
 
+---
+
+## Phase 4: 手動構築結果
+
+Phase 4では、AWSマネジメントコンソールを利用して、CloudFront + S3 + ALB + EC2 + RDS 構成を手動で構築しました。
+
+構築後、以下の通信経路を確認しました。
+
 ```text
+User
+  |
+  v
+CloudFront
+  |----------------------|
+  |                      |
+  v                      v
+S3                    ALB
+Static Web             |
+HTML/CSS/JS            v
+                      EC2
+                   API Server
+                       |
+                       v
+                      RDS
+                     MySQL
 ```
 
+### 確認した通信
+
+| 確認項目 | 結果 |
+|---|---|
+| CloudFront経由でS3の静的Webページを表示 | OK |
+| CloudFrontの `/api/health` からALB経由でEC2へ到達 | OK |
+| CloudFrontの `/api/message` からEC2のAPIレスポンスを取得 | OK |
+| S3上のJavaScriptから `/api/message` を呼び出し | OK |
+| EC2からRDS MySQLへ接続 | OK |
+| RDS上にDB・テーブル・テストデータを作成 | OK |
+| SSM Session ManagerでPrivate EC2へ接続 | OK |
+| Private EC2からNAT Gateway経由で外部通信 | OK |
+
+### CloudFrontのパスベース振り分け
+
+CloudFrontでは、以下のようにパスごとにOriginを振り分けました。
+
+```text
+/        -> S3
+/api/*   -> ALB -> EC2
+```
+
+これにより、利用者はCloudFrontの単一ドメインにアクセスしながら、静的コンテンツとAPI通信を分離して利用できます。
+
+```text
+https://<CloudFront domain>/
+  -> S3のindex.htmlを表示
+
+https://<CloudFront domain>/api/health
+  -> ALB経由でEC2のAPIへ到達
+
+https://<CloudFront domain>/api/message
+  -> ALB経由でEC2のAPIレスポンスを取得
+```
+
+### EC2からRDSへの接続確認
+
+Private App Subnet上のEC2から、Private DB Subnet上のRDS MySQLへ接続確認を行いました。
+
+```text
+EC2
+  |
+  | MySQL 3306
+  v
+RDS MySQL
+```
+
+RDS接続後、以下の操作を実施しました。
+
+```sql
+CREATE DATABASE appdb;
+
+USE appdb;
+
+CREATE TABLE messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  message VARCHAR(255) NOT NULL
+);
+
+INSERT INTO messages (message)
+VALUES ('Hello from RDS!');
+
+SELECT * FROM messages;
+```
+
+確認結果は以下です。
+
+```text
++----+-----------------+
+| id | message         |
++----+-----------------+
+|  1 | Hello from RDS! |
++----+-----------------+
+```
+
+### Security Groupによる通信制御
+
+今回の構成では、Security Groupで以下の通信のみを許可しました。
+
+```text
+ALB Security Group:
+  Inbound:
+    HTTP 80 from 0.0.0.0/0
+
+EC2 Security Group:
+  Inbound:
+    HTTP 80 from ALB Security Group
+
+RDS Security Group:
+  Inbound:
+    MySQL 3306 from EC2 Security Group
+```
+
+これにより、EC2とRDSを直接インターネットに公開せず、以下の通信経路に限定しました。
+
+```text
+User
+  -> CloudFront
+  -> ALB
+  -> EC2
+  -> RDS
+```
+
+### SSM Session ManagerによるEC2接続
+
+EC2はPrivate Subnetに配置し、Public IPを付与しませんでした。  
+また、SSH 22番は開放せず、SSM Session Managerで接続しました。
+
+```text
+管理者
+  |
+  v
+AWS Systems Manager Session Manager
+  |
+  v
+Private EC2
+```
+
+EC2には、SSM接続用に以下のIAM Roleをアタッチしました。
+
+```text
+IAM Role:
+  cloudnative-webapp-ec2-role
+
+Policy:
+  AmazonSSMManagedInstanceCore
+```
+
+### 手動構築で得られた学び
+
+このPhaseでは、以下を実際に確認しました。
+
+- CloudFrontを単一入口として利用する構成
+- S3を直接公開せずCloudFront経由で配信する構成
+- CloudFrontのBehaviorによる `/api/*` の振り分け
+- ALBからPrivate EC2への通信
+- Private EC2からPrivate RDSへのMySQL接続
+- Security Groupを使った段階的な通信制御
+- SSM Session ManagerによるPrivate EC2管理
+- NAT Gatewayを使ったPrivate Subnetからの外向き通信
+
+### 補足
+
+学習用構成のため、動作確認後にAWSリソースは削除済みです。  
+次のPhaseでは、この手動構築した構成をTerraformでコード化します。
 ---
 
 ## 今後の拡張予定
