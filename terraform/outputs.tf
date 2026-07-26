@@ -32,3 +32,18 @@ output "nat_gateway_id" {
   description = "NAT Gateway ID."
   value       = module.network.nat_gateway_id
 }
+
+output "alb_sg_id" {
+  description = "ALB Security Group ID."
+  value       = module.security.alb_sg_id
+}
+
+output "ec2_sg_id" {
+  description = "EC2 Security Group ID."
+  value       = module.security.ec2_sg_id
+}
+
+output "rds_sg_id" {
+  description = "RDS Security Group ID."
+  value       = module.security.rds_sg_id
+}

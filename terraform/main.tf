@@ -10,3 +10,9 @@ module "network" {
   private_db_subnet_1a_cidr  = var.private_db_subnet_1a_cidr
   private_db_subnet_1c_cidr  = var.private_db_subnet_1c_cidr
 }
+module "security" {
+  source = "./modules/security"
+
+  project_name = var.project_name
+  vpc_id       = module.network.vpc_id
+}
