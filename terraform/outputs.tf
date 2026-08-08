@@ -47,3 +47,13 @@ output "rds_sg_id" {
   description = "RDS Security Group ID."
   value       = module.security.rds_sg_id
 }
+
+output "app_instance_id" {
+  description = "Application EC2 instance ID."
+  value       = module.compute.app_instance_id
+}
+
+output "app_private_ip" {
+  description = "Application EC2 private IP address."
+  value       = module.compute.app_private_ip
+}
